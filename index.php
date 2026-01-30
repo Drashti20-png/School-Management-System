@@ -1,218 +1,109 @@
-\<?php
+<?php 
 session_start();
-if (!isset($_SESSION['principal_id']) || $_SESSION['role'] !== "Principal") {
-    header("Location: ../login.php?error=Access denied");
+if (!isset($_SESSION['teacher_id']) || $_SESSION['role'] !== 'Teacher') {
+    header("Location: ../Teacher/req/index.php?error=Please login first");
     exit;
 }
 
 include "../DB_connection.php";
+include "../Teacher/data/teacher.php";
+include "data/subject.php";
+include "data/class.php";
+include "data/grade.php";
+include "data/section.php";
 
-// Principal details
-$principal_id = $_SESSION['principal_id'];
-$stmt = $conn->prepare("SELECT * FROM principal WHERE principal_id = ?");
-$stmt->execute([$principal_id]);
-$principal = $stmt->fetch(PDO::FETCH_ASSOC);
-
-// Counts
-$studentCount = $conn->query("SELECT COUNT(*) FROM students")->fetchColumn();
-$teacherCount = $conn->query("SELECT COUNT(*) FROM teacher")->fetchColumn();
-$registrarCount = $conn->query("SELECT COUNT(*) FROM registrar_office")->fetchColumn();
-
-// Fetch recent notices
-$noticeStmt = $conn->prepare("SELECT * FROM notices WHERE posted_by = ? ORDER BY created_at DESC LIMIT 5");
-$noticeStmt->execute([$principal_id]);
-$notices = $noticeStmt->fetchAll(PDO::FETCH_ASSOC);
+$teacher_id = $_SESSION['teacher_id'];
+$teacher = getTeacherById($teacher_id, $conn);
+if (!$teacher) {
+    session_destroy();
+    header("Location: ../Teacher/req/index.php?error=Teacher not found");
+    exit;
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Principal Dashboard</title>
-<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons/font/bootstrap-icons.css" rel="stylesheet">
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Teacher Dashboard</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.0/dist/css/bootstrap.min.css">
+<link rel="stylesheet" href="css/style.css">
+<link rel="icon" href="logo.png">
 <style>
-body {
-    background-color: #FFB6C1;
-    font-family: 'Segoe UI', sans-serif;
-}
-.navbar { box-shadow: 0 3px 10px rgba(0,0,0,0.1); }
-
-/* Gradient Cards */
-.card-gradient { background: linear-gradient(135deg, #6a11cb 0%, #2575fc 100%); color: #fff; }
-.card-gradient-2 { background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%); color: #fff; }
-.card-gradient-3 { background: linear-gradient(135deg, #f7971e 0%, #ffd200 100%); color: #fff; }
-
-.card {
-    border-radius: 1rem;
-    transition: all 0.3s ease-in-out;
-}
-.card:hover {
-    transform: translateY(-5px);
-    box-shadow: 0 10px 25px rgba(0,0,0,0.15);
-}
-
-.card h5 { font-size: 1rem; margin-bottom:0.3rem; }
-.card h3 { font-size: 1.5rem; color:#fff; }
-.card i { font-size: 1.8rem; }
-
-.profile-card { text-align: center; background: #fff; }
-.profile-card img { 
-    width: 100px; 
-    height: 100px; 
-    border-radius: 50%; 
-    object-fit: cover; 
-    border: 3px solid #0d6efd; 
-    display:block; 
-    margin:0 auto; 
-}
-
-.mini-chart { width: 250px; height: 250px; margin: 0 auto; }
-
-.notice-card { max-height: 220px; overflow-y: auto; border-radius: 0.75rem; background: #fff; padding:10px;}
-.notice-card li { border:none; padding:8px 0; border-bottom:1px solid #dee2e6; }
-.notice-card li:last-child { border-bottom:none; }
-
-.animate-counter { font-weight:bold; font-size:1.6rem; }
+    .profile-img {
+        width: 150px;
+        height: 150px;
+        object-fit: cover;
+        border-radius: 50%;
+        border: 2px solid #0d6efd;
+        margin: auto;
+        display: block;
+    }
 </style>
 </head>
 <body>
 
-<nav class="navbar navbar-expand-lg navbar-light bg-white">
-    <div class="container-fluid">
-        <a class="navbar-brand fw-bold" href="#">Principal Panel</a>
-        <div class="d-flex">
-            <span class="me-3">
-                Welcome, <?= htmlspecialchars($principal['fname']." ".$principal['lname']); ?>
-            </span>
-            <a href="../logout.php" class="btn btn-outline-primary btn-sm">Logout</a>
-        </div>
-    </div>
-</nav>
+<?php include "inc/navbar.php"; ?>
 
 <div class="container mt-5">
-    <div class="row g-4">
-        <!-- Profile Card -->
-        <div class="col-lg-4">
-            <div class="card profile-card shadow p-4">
-                <?php 
-                // Check if image exists, else show default
-                $imagePath = "../uploads/" . $principal['image'];
-                if(!empty($principal['image']) && file_exists($imagePath)) {
-                    echo '<img src="'. htmlspecialchars($imagePath) .'" alt="Principal Photo">';
-                } else {
-                    echo '<img src="../uploads/2151237437.png.jpg" alt="Principal Photo">';
-                }
-                ?>
-                <h5 class="mt-3 fw-bold"><?= htmlspecialchars($principal['fname']." ".$principal['lname']); ?></h5>
-                <p>Qualification: <?= htmlspecialchars($principal['qualification']); ?></p>
-                <p><i class="bi bi-envelope me-1"></i> <?= htmlspecialchars($principal['email_address']); ?></p>
-                <p><i class="bi bi-telephone me-1"></i> <?= htmlspecialchars($principal['phone_number']); ?></p>
-            </div>
+    <div class="card mx-auto" style="width: 22rem;">
+        <?php
+       
+        $imagePath = "../uploads/" . $teacher['image'];
+
+        if (!empty($teacher['image']) && file_exists($imagePath)) {
+            echo '<img src="'.htmlspecialchars($imagePath).'" class="profile-img" alt="Teacher Photo">';
+        } else {
+            echo '<img src="img/teacher-'.$teacher['gender'].'.png" class="profile-img" alt="Teacher Photo">';
+        }
+        ?>
+        <div class="card-body text-center">
+            <h5 class="card-title">@<?= htmlspecialchars($teacher['username']) ?></h5>
         </div>
-
-        <!-- Dashboard Cards -->
-        <div class="col-lg-8">
-            <div class="row g-3 mb-4">
-                <!-- Students Card -->
-                <div class="col-md-4">
-                    <div class="card card-gradient text-center p-4 shadow-sm">
-                        <i class="bi bi-people-fill"></i>
-                        <h5 class="mt-2">Total Students</h5>
-                        <div class="animate-counter" data-target="<?= $studentCount ?>">0</div>
-                    </div>
-                </div>
-
-                <!-- Teachers Card -->
-                <div class="col-md-4">
-                    <div class="card card-gradient-2 text-center p-4 shadow-sm">
-                        <i class="bi bi-person-lines-fill"></i>
-                        <h5 class="mt-2">Teachers</h5>
-                        <div class="animate-counter" data-target="<?= $teacherCount ?>">0</div>
-                    </div>
-                </div>
-
-                <!-- Registrar Office Card -->
-                <div class="col-md-4">
-                    <div class="card card-gradient-3 text-center p-4 shadow-sm">
-                        <i class="bi bi-building"></i>
-                        <h5 class="mt-2">Registrar Office</h5>
-                        <div class="animate-counter" data-target="<?= $registrarCount ?>">0</div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Mini Chart -->
-            <div class="card shadow-sm p-3 mb-4 text-center">
-                <h5 class="mb-3 fw-bold">School Overview</h5>
-                <canvas id="schoolChart" class="mini-chart"></canvas>
-            </div>
-
-            <!-- Notices -->
-            <div class="card shadow-sm p-3">
-                <h5 class="fw-bold mb-3">Post a Notice</h5>
-                <form method="post" action="post_notice.php" class="mb-3">
-                    <textarea name="notice" class="form-control mb-2" rows="3" placeholder="Write your announcement..." required></textarea>
-                    <button type="submit" class="btn btn-primary btn-sm">Post Notice</button>
-                </form>
-
-                <h6 class="fw-bold mb-2">Recent Notices</h6>
-                <ul class="list-group list-group-flush notice-card">
-                    <?php if ($notices): ?>
-                        <?php foreach ($notices as $notice): ?>
-                            <li>
-                                <small class="text-muted"><?= date("d M Y, H:i", strtotime($notice['created_at'])) ?></small><br>
-                                <?= htmlspecialchars($notice['notice']) ?>
-                            </li>
-                        <?php endforeach; ?>
-                    <?php else: ?>
-                        <p class="text-muted mb-0">No notices posted yet.</p>
-                    <?php endif; ?>
-                </ul>
-            </div>
+        <ul class="list-group list-group-flush">
+            <li class="list-group-item">Name: <?= htmlspecialchars($teacher['fname'].' '.$teacher['lname']) ?></li>
+            <li class="list-group-item">Username: <?= htmlspecialchars($teacher['username']) ?></li>
+            <li class="list-group-item">Employee #: <?= htmlspecialchars($teacher['employee_number']) ?></li>
+            <li class="list-group-item">Address: <?= htmlspecialchars($teacher['address']) ?></li>
+            <li class="list-group-item">Phone: <?= htmlspecialchars($teacher['phone_number']) ?></li>
+            <li class="list-group-item">Email: <?= htmlspecialchars($teacher['email_address']) ?></li>
+            <li class="list-group-item">Qualification: <?= htmlspecialchars($teacher['qualification']) ?></li>
+            <li class="list-group-item">DOB: <?= htmlspecialchars($teacher['date_of_birth']) ?></li>
+            <li class="list-group-item">Joined: <?= htmlspecialchars($teacher['date_of_joined']) ?></li>
+            <li class="list-group-item">Gender: <?= htmlspecialchars($teacher['gender']) ?></li>
+            <li class="list-group-item">
+                Subjects: 
+                <?php 
+                $subjectsList = '';
+                foreach(str_split(trim($teacher['subjects'])) as $subId){
+                    $sub = getSubjectById($subId, $conn);
+                    if($sub) $subjectsList .= $sub['subject_code'].', ';
+                }
+                echo rtrim($subjectsList, ', ');
+                ?>
+            </li>
+            <li class="list-group-item">
+                Classes: 
+                <?php
+                $classList = '';
+                foreach(str_split(trim($teacher['class'])) as $classId){
+                    $cls = getClassById($classId, $conn);
+                    if($cls){
+                        $grade = getGradeById($cls['grade'], $conn);
+                        $section = getSectioById($cls['section'], $conn);
+                        if($grade && $section) $classList .= $grade['grade_code'].'-'.$grade['grade'].$section['section'].', ';
+                    }
+                }
+                echo rtrim($classList, ', ');
+                ?>
+            </li>
+        </ul>
+        <div class="card-body text-center">
+            <a href="logout.php" class="btn btn-danger w-100">Logout</a>
         </div>
     </div>
 </div>
 
-<script>
-// Animate counters
-const counters = document.querySelectorAll('.animate-counter');
-counters.forEach(counter => {
-    const updateCount = () => {
-        const target = +counter.getAttribute('data-target');
-        let count = +counter.innerText;
-        const increment = Math.ceil(target / 100);
-        if(count < target){
-            counter.innerText = count + increment;
-            setTimeout(updateCount, 20);
-        } else {
-            counter.innerText = target;
-        }
-    };
-    updateCount();
-});
-
-// Chart.js Doughnut
-const ctx = document.getElementById('schoolChart').getContext('2d');
-new Chart(ctx, {
-    type: 'doughnut',
-    data: {
-        labels: ['Students', 'Teachers', 'Registrar Office'],
-        datasets: [{
-            data: [<?= $studentCount ?>, <?= $teacherCount ?>, <?= $registrarCount ?>],
-            backgroundColor: ['#0d6efd','#198754','#ffc107'],
-            borderColor: '#ffffff',
-            borderWidth: 2
-        }]
-    },
-    options: {
-        plugins: { legend: { position: 'bottom', labels: { font:{size:14}, color:'#333' } } },
-        cutout: '70%',
-        responsive: true
-    }
-});
-</script>
-
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>

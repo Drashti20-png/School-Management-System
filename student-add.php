@@ -1,123 +1,107 @@
-<?php 
+<?php
 session_start();
-if (isset($_SESSION['admin_id']) && 
-    isset($_SESSION['role'])) {
-
-    if ($_SESSION['role'] == 'Admin') {
-    	
-
-if (isset($_POST['fname']) &&
-    isset($_POST['lname']) &&
-    isset($_POST['username']) &&
-    isset($_POST['pass'])     &&
-    isset($_POST['address'])  &&
-    isset($_POST['gender'])   &&
-    isset($_POST['email_address']) &&
-    isset($_POST['date_of_birth']) &&
-    isset($_POST['parent_fname'])  &&
-    isset($_POST['parent_lname'])  &&
-    isset($_POST['parent_phone_number']) &&
-    isset($_POST['section']) &&
-    isset($_POST['grade'])) {
-    
-    include '../../DB_connection.php';
-    include "../data/student.php";
-
-    $fname = $_POST['fname'];
-    $lname = $_POST['lname'];
-    $uname = $_POST['username'];
-    $pass = $_POST['pass'];
-
-    $address = $_POST['address'];
-    $gender = $_POST['gender'];
-    $email_address = $_POST['email_address'];
-    $date_of_birth = $_POST['date_of_birth'];
-    $parent_fname = $_POST['parent_fname'];
-    $parent_lname = $_POST['parent_lname'];
-    $parent_phone_number = $_POST['parent_phone_number'];
-
-    $grade = $_POST['grade'];
-    $section = $_POST['section'];
-    
-
-    $data = 'uname='.$uname.'&fname='.$fname.'&lname='.$lname.'&address='.$address.'&gender='.$email_address.'&pfn='.$parent_fname.'&pln='.$parent_lname.'&ppn='.$parent_phone_number;
-
-    if (empty($fname)) {
-		$em  = "First name is required";
-		header("Location: ../student-add.php?error=$em&$data");
-		exit;
-	}else if (empty($lname)) {
-		$em  = "Last name is required";
-		header("Location: ../student-add.php?error=$em&$data");
-		exit;
-	}else if (empty($uname)) {
-		$em  = "Username is required";
-		header("Location: ../student-add.php?error=$em&$data");
-		exit;
-	}else if (!unameIsUnique($uname, $conn)) {
-		$em  = "Username is taken! try another";
-		header("Location: ../student-add.php?error=$em&$data");
-		exit;
-	}else if (empty($pass)) {
-		$em  = "Password is required";
-		header("Location: ../student-add.php?error=$em&$data");
-		exit;
-	}else if (empty($address)) {
-        $em  = "Address is required";
-        header("Location: ../student-add.php?error=$em&$data");
-        exit;
-    }else if (empty($gender)) {
-        $em  = "Gender is required";
-        header("Location: ../student-add.php?error=$em&$data");
-        exit;
-    }else if (empty($email_address)) {
-        $em  = "Email address is required";
-        header("Location: ../student-add.php?error=$em&$data");
-        exit;
-    }else if (empty($date_of_birth)) {
-        $em  = "Date of birth is required";
-        header("Location: ../student-add.php?error=$em&$data");
-        exit;
-    }else if (empty($parent_fname)) {
-        $em  = "Parent first name is required";
-        header("Location: ../student-add.php?error=$em&$data");
-        exit;
-    }else if (empty($parent_lname)) {
-        $em  = "Parent last name is required";
-        header("Location: ../student-add.php?error=$em&$data");
-        exit;
-    }else if (empty($parent_phone_number)) {
-        $em  = "Parent phone number is required";
-        header("Location: ../student-add.php?error=$em&$data");
-        exit;
-    }else if (empty($section)) {
-        $em  = "Section is required";
-        header("Location: ../student-add.php?error=$em&$data");
-        exit;
-    }else {
-        // hashing the password
-        $pass = password_hash($pass, PASSWORD_DEFAULT);
-        $sql  = "INSERT INTO
-                 students(username, password, fname, lname, grade, section, address, gender, email_address, date_of_birth, parent_fname, parent_lname, parent_phone_number)
-                 VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)";
-        $stmt = $conn->prepare($sql);
-        $stmt->execute([$uname, $pass, $fname, $lname, $grade, $section, $address, $gender, $email_address, $date_of_birth, $parent_fname, $parent_lname, $parent_phone_number]);
-        $sm = "New student registered successfully";
-        header("Location: ../student-add.php?success=$sm");
-        exit;
-	}
-    
-  }else {
-  	$em = "An error occurred";
-    header("Location: ../student-add.php?error=$em");
+if (!isset($_SESSION['admin_id']) || $_SESSION['role'] !== 'Admin') {
+    header("Location: ../login.php");
     exit;
-  }
+}
 
-  }else {
-    header("Location: ../../logout.php");
-    exit;
-  } 
-}else {
-	header("Location: ../../logout.php");
-	exit;
-} 
+include "../DB_connection.php";
+include "data/grade.php";
+include "data/section.php";
+
+$grades = getAllGrades($conn);
+$sections = getAllSections($conn);
+
+$fname = $_GET['fname'] ?? '';
+$lname = $_GET['lname'] ?? '';
+$uname = $_GET['uname'] ?? '';
+$address = $_GET['address'] ?? '';
+$email = $_GET['email'] ?? '';
+$pfn = $_GET['pfn'] ?? '';
+$pln = $_GET['pln'] ?? '';
+$ppn = $_GET['ppn'] ?? '';
+?>
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin - Add Student</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.0/dist/css/bootstrap.min.css">
+</head>
+<body>
+<div class="container mt-5">
+    <a href="student.php" class="btn btn-dark">Go Back</a>
+    <form action="req/student-add.php" method="post" enctype="multipart/form-data" class="shadow p-3 mt-3">
+        <h3>Add New Student</h3><hr>
+
+        <div class="mb-3">
+            <label>First Name</label>
+            <input type="text" name="fname" class="form-control" value="<?= htmlspecialchars($fname) ?>" required>
+        </div>
+        <div class="mb-3">
+            <label>Last Name</label>
+            <input type="text" name="lname" class="form-control" value="<?= htmlspecialchars($lname) ?>" required>
+        </div>
+        <div class="mb-3">
+            <label>Username</label>
+            <input type="text" name="username" class="form-control" value="<?= htmlspecialchars($uname) ?>" required>
+        </div>
+        <div class="mb-3">
+            <label>Password</label>
+            <input type="text" name="pass" class="form-control" required>
+        </div>
+        <div class="mb-3">
+            <label>Email</label>
+            <input type="email" name="email_address" class="form-control" value="<?= htmlspecialchars($email) ?>">
+        </div>
+        <div class="mb-3">
+            <label>Address</label>
+            <input type="text" name="address" class="form-control" value="<?= htmlspecialchars($address) ?>">
+        </div>
+        <div class="mb-3">
+            <label>Date of Birth</label>
+            <input type="date" name="date_of_birth" class="form-control">
+        </div>
+        <div class="mb-3">
+            <label>Gender</label><br>
+            <input type="radio" name="gender" value="Male" checked> Male
+            <input type="radio" name="gender" value="Female"> Female
+        </div>
+        <div class="mb-3">
+            <label>Parent First Name</label>
+            <input type="text" name="parent_fname" class="form-control" value="<?= htmlspecialchars($pfn) ?>">
+        </div>
+        <div class="mb-3">
+            <label>Parent Last Name</label>
+            <input type="text" name="parent_lname" class="form-control" value="<?= htmlspecialchars($pln) ?>">
+        </div>
+        <div class="mb-3">
+            <label>Parent Phone Number</label>
+            <input type="text" name="parent_phone_number" class="form-control" value="<?= htmlspecialchars($ppn) ?>">
+        </div>
+        <div class="mb-3">
+            <label>Grade</label><br>
+            <?php foreach ($grades as $grade): ?>
+                <input type="radio" name="grade" value="<?= $grade['grade_id'] ?>"> <?= $grade['grade_code'].'-'.$grade['grade'] ?>
+            <?php endforeach; ?>
+        </div>
+        <div class="mb-3">
+            <label>Section</label><br>
+            <?php foreach ($sections as $section): ?>
+                <input type="radio" name="section" value="<?= $section['section_id'] ?>"> <?= $section['section'] ?>
+            <?php endforeach; ?>
+        </div>
+        <div class="mb-3">
+            <label>Upload Image</label>
+            <input type="file" name="image" class="form-control" accept="image/*">
+        </div>
+
+        <button type="submit" class="btn btn-primary">Register</button>
+    </form>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
